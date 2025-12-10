@@ -5,9 +5,9 @@ import { gsap } from "gsap";
 const Profile = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState({
-    name: "",
-    email: "",
-    reminderPreference: "none",
+    name: "Sam",
+    email: "sam.doe@example.com",
+    reminderPreference: "weekly",
   });
   const [saved, setSaved] = useState(false);
   const pageRef = useRef(null);
