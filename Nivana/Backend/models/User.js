@@ -1,63 +1,46 @@
 const mongoose = require("mongoose");
-const Counter = require("./Counter");
 
-const userSchema = new mongoose.Schema({
-  // 1. userId (Auto-Increment)
-  userId: {
-    type: Number,
-    unique: true,
-    sparse: true 
+const UserSchema = new mongoose.Schema({
+  // --- Basic Fields ---
+  fullName: { 
+    type: String, 
+    required: true, 
+    trim: true 
   },
-
-  // --- Baaki Fields ---
-  fullName: {
-    type: String,
-    required: true,
-    trim: true
+  email: { 
+    type: String, 
+    required: true, 
+    unique: true, 
+    lowercase: true, 
+    trim: true 
   },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    trim: true
+  password: { 
+    type: String, 
+    required: true 
   },
-  password: {
-    type: String,
-    required: false 
-  },
-  provider: {
-    type: String,
-    default: "local"
-  },
-  profileImage: {
-    type: String,
-    default: ""
+  
+  profileImage: { 
+    type: String, 
+    default: "" 
   },
 
-  // ✅ NEW FIELDS FOR FORGOT PASSWORD
+  // --- Streak & Login Tracking ---
+  // Default 1 rakha hai taaki naya user 0 par na ho
+  streak: {
+    current: { type: Number, default: 1 }, 
+    longest: { type: Number, default: 1 },
+    badges: { type: [String], default: [] }
+  },
+
+  lastLoginDate: { 
+    type: Date, 
+    default: Date.now 
+  },
+
+  // --- Forgot Password Fields ---
   resetPasswordToken: String,
-  resetPasswordExpire: Date
+  resetPasswordExpire: Date,
 
 }, { timestamps: true });
 
-
-// ✅ FIXED MAGIC LOGIC (Auto-Increment)
-userSchema.pre("save", async function () {
-  const doc = this;
-
-  if (doc.isNew) {
-    try {
-      const counter = await Counter.findOneAndUpdate(
-        { id: "userId" },
-        { $inc: { seq: 1 } },
-        { new: true, upsert: true }
-      );
-      doc.userId = counter.seq;
-    } catch (error) {
-      throw error;
-    }
-  }
-});
-
-module.exports = mongoose.model("User", userSchema);
+module.exports = mongoose.model("User", UserSchema);

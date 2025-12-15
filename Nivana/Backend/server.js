@@ -1,9 +1,10 @@
-require("dotenv").config();
+const path = require("path");
+// ✅ FIX: .env file ka pakka path set kiya taaki API Key load ho jaye
+require("dotenv").config({ path: path.resolve(__dirname, "./.env") });
 
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const path = require("path"); // ✅ Required for serving images
 const session = require("express-session");
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
@@ -16,6 +17,9 @@ const app = express();
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
 
+// Debugging: Check if Key is loaded
+console.log("🔑 API Key Status:", process.env.GEMINI_API_KEY ? "Loaded ✅" : "MISSING ❌");
+
 /* ---------------------- MIDDLEWARE ---------------------- */
 app.use(express.json());
 
@@ -26,8 +30,7 @@ app.use(
   })
 );
 
-// ✅ CRITICAL: Serve Static Files (Uploaded Images)
-// This makes http://localhost:5000/uploads/profile_images/filename.jpg accessible
+// Serve Static Files (Uploaded Images)
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 app.use(
@@ -50,6 +53,7 @@ mongoose
 /* ---------------------- MODELS ---------------------- */
 require("./models/User");
 require("./models/Assessment");
+require("./models/Mood");
 
 /* ---------------------- PASSPORT CONFIG ---------------------- */
 passport.serializeUser((user, done) => done(null, user.id));
@@ -123,16 +127,17 @@ passport.use(
 
 /* ---------------------- ROUTES ---------------------- */
 
-// ✅ AUTH ROUTE (Handles Login, Signup, Me, and Profile Update/Uploads)
-// This replaces the previous inline app.post("/api/auth/login"...) logic
 app.use("/api/auth", require("./routes/auth"));
-
-// API Routes
 app.use("/api/assessments", require("./routes/assessments"));
+
+// Dashboard Route
 app.use("/api/dashboard", require("./middleware/auth"), require("./routes/dashboard"));
 
+// Mood Routes
+app.use("/api/moods", require("./routes/mood"));
+
+
 /* ---------------------- OAUTH CALLBACK ROUTES ---------------------- */
-// These remain in server.js to interact directly with Passport flow
 
 app.get(
   "/auth/google",
@@ -143,9 +148,7 @@ app.get(
   "/auth/google/callback",
   passport.authenticate("google", { failureRedirect: `${FRONTEND_URL}/login` }),
   (req, res) => {
-    // Generate token
     const token = jwt.sign({ id: req.user._id }, process.env.JWT_SECRET);
-    // Redirect to frontend dashboard with token
     res.redirect(`${FRONTEND_URL}/dashboard?token=${token}`);
   }
 );
