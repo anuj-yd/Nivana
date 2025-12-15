@@ -1,5 +1,7 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto"); // Built-in module
+const nodemailer = require("nodemailer"); // Email sender
 const User = require("../models/User");
 
 // --- LOGIN ---
@@ -23,7 +25,6 @@ exports.login = async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    // Return full user object including profileImage
     return res.json({
       token,
       user: {
@@ -31,12 +32,6 @@ exports.login = async (req, res) => {
         userId: user.userId,
         fullName: user.fullName,
         email: user.email,
-        bio: user.bio,
-        location: user.location,
-        wellnessFocus: user.wellnessFocus,
-        emergencyName: user.emergencyName,
-        emergencyPhone: user.emergencyPhone,
-        reminderPreference: user.reminderPreference,
         profileImage: user.profileImage, 
         createdAt: user.createdAt
       },
@@ -55,7 +50,6 @@ exports.signup = async (req, res) => {
     if (await User.findOne({ email })) return res.status(400).json({ msg: "User exists" });
 
     const hash = await bcrypt.hash(password, 10);
-    // Note: Ensure userId logic exists in your app if strictly required
     const user = await User.create({ fullName, email, password: hash, provider: "local" });
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -76,7 +70,7 @@ exports.getMe = async (req, res) => {
   }
 };
 
-// --- ✅ UPDATE PROFILE (Handles File Upload) ---
+// --- UPDATE PROFILE ---
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -94,9 +88,7 @@ exports.updateProfile = async (req, res) => {
       }
     });
 
-    // ✅ Handle Image Upload
     if (req.file) {
-      // Store relative path in DB
       actualUpdates.profileImage = `/uploads/profile_images/${req.file.filename}`;
     }
 
@@ -113,5 +105,98 @@ exports.updateProfile = async (req, res) => {
   } catch (err) {
     console.error("Update error:", err);
     res.status(500).json({ success: false, msg: "Server error updating profile" });
+  }
+};
+
+// --- ✅ NEW & FIXED: FORGOT PASSWORD ---
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  let user; // ✅ Fix: User variable ko try block ke bahar declare kiya
+
+  try {
+    user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    // Reset Token Generate
+    const resetToken = crypto.randomBytes(20).toString("hex");
+
+    // Hash karke DB me save (Security)
+    user.resetPasswordToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 Minutes
+
+    await user.save();
+
+    // Reset URL
+    const clientURL = process.env.CLIENT_URL || "http://localhost:5173";
+    const resetUrl = `${clientURL}/reset-password/${resetToken}`;
+
+    const message = `
+      <h1>You have requested a password reset</h1>
+      <p>Please go to this link to reset your password:</p>
+      <a href=${resetUrl} clicktracking=off>${resetUrl}</a>
+    `;
+
+    // Email Config
+    const transporter = nodemailer.createTransport({
+      service: "Gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS // App Password (without spaces)
+      },
+    });
+
+    await transporter.sendMail({
+      to: user.email,
+      subject: "Password Reset Request - NIVANA",
+      html: message,
+    });
+
+    res.status(200).json({ success: true, data: "Email Sent" });
+
+  } catch (err) {
+    console.error("Email Error:", err);
+    
+    // ✅ Fix: Check karein agar user exist karta hai tabhi token clear karein
+    if (user) {
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save({ validateBeforeSave: false }); // Validation ignore karke save karein
+    }
+    
+    res.status(500).json({ msg: "Email could not be sent" });
+  }
+};
+
+// --- ✅ RESET PASSWORD ---
+exports.resetPassword = async (req, res) => {
+  // URL se token le kar hash match karein
+  const resetPasswordToken = crypto.createHash("sha256").update(req.params.resetToken).digest("hex");
+
+  try {
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ msg: "Invalid or Expired Token" });
+    }
+
+    // Naya Password Hash karein
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(req.body.password, salt);
+
+    // Tokens clear karein
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    await user.save();
+
+    res.status(201).json({ success: true, data: "Password Updated Success" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Server error" });
   }
 };

@@ -1,34 +1,63 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
+const Counter = require("./Counter");
 
 const userSchema = new mongoose.Schema({
-  // Auto-increment ID logic if you use it
-  userId: { type: Number, unique: true, index: true }, 
-
-  fullName: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, default: '' },
-  provider: { type: String, default: 'local' },
-
-  // ✅ NEW PROFILE FIELDS
-  bio: { type: String, default: "Taking it one day at a time. 🌱" },
-  location: { type: String, default: "" },
-  wellnessFocus: { type: String, default: "General Wellness" },
-  emergencyName: { type: String, default: "" },
-  emergencyPhone: { type: String, default: "" },
-  reminderPreference: { type: String, default: "none" },
-  
-  // ✅ IMAGE PATH STORE
-  profileImage: { type: String, default: "" }, 
-
-  createdAt: { type: Date, default: Date.now },
-
-  // Streak Logic
-  lastLoginDate: { type: Date, default: null },
-  streak: {
-    current: { type: Number, default: 0 },
-    longest: { type: Number, default: 0 },
-    badges: [{ type: String }],
+  // 1. userId (Auto-Increment)
+  userId: {
+    type: Number,
+    unique: true,
+    sparse: true 
   },
+
+  // --- Baaki Fields ---
+  fullName: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true
+  },
+  password: {
+    type: String,
+    required: false 
+  },
+  provider: {
+    type: String,
+    default: "local"
+  },
+  profileImage: {
+    type: String,
+    default: ""
+  },
+
+  // ✅ NEW FIELDS FOR FORGOT PASSWORD
+  resetPasswordToken: String,
+  resetPasswordExpire: Date
+
+}, { timestamps: true });
+
+
+// ✅ FIXED MAGIC LOGIC (Auto-Increment)
+userSchema.pre("save", async function () {
+  const doc = this;
+
+  if (doc.isNew) {
+    try {
+      const counter = await Counter.findOneAndUpdate(
+        { id: "userId" },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+      );
+      doc.userId = counter.seq;
+    } catch (error) {
+      throw error;
+    }
+  }
 });
 
-module.exports = mongoose.models.User || mongoose.model('User', userSchema);
+module.exports = mongoose.model("User", userSchema);

@@ -8,8 +8,12 @@ import Dashboard from "./components/Dashboard";
 import Assessment from "./components/Assessment";
 import Profile from "./components/Profile";
 import Guidance from "./components/Guidance";
-import History from "./components/History"; // ✅ 1. Import Karein
+import History from "./components/History";
 import GlobalLayout from "./components/GlobalLayout";
+
+// ✅ 1. Naye Components Import Karein
+import ForgotPassword from "./components/ForgotPassword";
+import ResetPassword from "./components/ResetPassword";
 
 function App() {
   return (
@@ -23,7 +27,11 @@ function App() {
         <Route path="/signup" element={<NivanaAuth />} />
         <Route path="/auth" element={<NivanaAuth />} />
 
-       <Route element={<GlobalLayout />}>
+        {/* ✅ 2. New Routes for Password Reset */}
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
+
+        <Route element={<GlobalLayout />}>
            <Route path="/dashboard" element={<Dashboard />} />
            <Route path="/assessments" element={<Assessment />} />
            <Route path="/guidance" element={<Guidance />} />
