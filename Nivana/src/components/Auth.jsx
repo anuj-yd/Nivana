@@ -93,13 +93,13 @@ const NivanaAuth = () => {
 
   // Forms state
   const [fullName, setFullName] = useState('');
-  const [email, setEmail]       = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const [loading, setLoading]       = useState(false);
-  const [errorMsg, setErrorMsg]     = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  
+
 
   // Vanta
   const vantaRef = useRef(null);
@@ -124,7 +124,7 @@ const NivanaAuth = () => {
           sunGlareColor: 0xff9919,
           sunlightColor: 0xff9933,
         });
-      } catch (e) {}
+      } catch (e) { }
     }
 
     return () => {
@@ -155,7 +155,7 @@ const NivanaAuth = () => {
         } else {
           navigate('/signup', { replace: true });
         }
-      } catch (e) {}
+      } catch (e) { }
     }, 400);
   };
 
@@ -187,14 +187,20 @@ const NivanaAuth = () => {
         : `${API_BASE_URL}/api/auth/signup`;
 
       const body = isLogin ? { email, password } : { fullName, email, password };
-      const res = await axios.post(url, body);
+      // const res = await axios.post(url, body);           fix by anshi
+      const res = await axios.post(
+        url,
+        body,
+        { withCredentials: true }
+      );        //update by anshi
+
 
       const data = res.data;
 
       if (!data || !data.token) {
         throw new Error("Token missing in auth response");
       }
-      
+
       auth.login(data.token, data.user);
 
       setFullName('');

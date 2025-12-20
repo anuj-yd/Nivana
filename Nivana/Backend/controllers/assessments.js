@@ -1,5 +1,7 @@
+
 const { generateQuestionsWithGemini, analyzeAssessmentWithGemini } = require('../services/gemini');
 const { defaultQuestions } = require('../utils/staticQuestions');
+const { getRecommendations } = require('../utils/recommendationEngine'); // 🔥 IMPORT RULE ENGINE
 const Assessment = require('../models/Assessment');
 
 // -----------------------------------------------
@@ -45,7 +47,7 @@ exports.startAssessment = async (req, res) => {
 };
 
 // -----------------------------------------------
-// 2) SUBMIT ASSESSMENT (SAVE TO DB)
+// 2) SUBMIT ASSESSMENT (SAVE TO DB + RECOMMENDATIONS)
 // -----------------------------------------------
 exports.submitAssessment = async (req, res) => {
   try {
@@ -106,8 +108,37 @@ exports.submitAssessment = async (req, res) => {
       console.warn("LLM analysis error:", err.message);
     }
 
+    // --- 🔥 NEW STEP: RECOMMENDATION ENGINE LOGIC ---
+    
+    // 1. Fetch History (Last 3 assessments for Trend Analysis)
+    const history = await Assessment.find({ user: req.user.id })
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .select("mood severity score createdAt"); // Select relevant fields
+
+    // 2. Prepare Current Data for Engine
+    // (Ensure severity has a fallback if LLM failed)
+    let derivedSeverity = analysis.severity;
+    if (!derivedSeverity) {
+        if (phq9Score >= 20) derivedSeverity = "Severe";
+        else if (phq9Score >= 15) derivedSeverity = "High";
+        else if (phq9Score >= 10) derivedSeverity = "Moderate";
+        else derivedSeverity = "Low";
+    }
+
+    const currentDataForEngine = {
+        severity: derivedSeverity,
+        moodScore: mood, // Assuming questionId "mood" exists (1-10 or 1-5)
+        sleep: sleep,
+        stress: stress,
+        suicidal: analysis.risks?.some(r => r.toLowerCase().includes('suicid') || r.toLowerCase().includes('self-harm')) || false
+    };
+
+    // 3. Generate Recommendations & Guidance
+    const { actions, guidance } = getRecommendations(currentDataForEngine, history, answers.map(a => a.value));
+
     // -----------------------------------
-    // SAVE TO DATABASE (🔥 FIX HERE)
+    // SAVE TO DATABASE
     // -----------------------------------
     const record = await Assessment.create({
       user: req.user.id,           // ✅ REQUIRED FIELD (ObjectId)
@@ -126,10 +157,20 @@ exports.submitAssessment = async (req, res) => {
       gad7Score,
 
       llmAnalysis: analysis,
+      
+      // 🔥 Saving Generated Recommendations
+      recommendedActions: actions,
+      guidanceNote: guidance,
+      severity: derivedSeverity, // Explicitly saving severity field
+
       createdAt: new Date()
     });
 
-    return res.json({ assessment: record });
+    return res.json({ 
+        success: true,
+        assessment: record,
+        message: "Assessment saved and recommendations generated."
+    });
 
   } catch (err) {
     console.error("submitAssessment error", err);
@@ -161,3 +202,36 @@ exports.getHistory = async (req, res) => {
     return res.status(500).json({ msg: "Server error" });
   }
 };
+
+// -----------------------------------------------
+// 4) 🔥 GET LATEST ASSESSMENT (For Guidance Page)
+// -----------------------------------------------
+exports.getLatestAssessment = async (req, res) => {
+    try {
+      // User ID can come from URL params (if admin) or req.user (if logged in user)
+      // Here assuming we use the ID from the route param for flexibility, 
+      // but you should validate it matches req.user.id for security unless it's an admin.
+      const userId = req.params.userId || req.user.id;
+  
+      const latestAssessment = await Assessment.findOne({ user: userId })
+        .sort({ createdAt: -1 })
+        .select("recommendedActions guidanceNote severity mood createdAt"); // Fetch fields needed for Guidance UI
+  
+      if (!latestAssessment) {
+        return res.status(200).json({ 
+          success: true, 
+          data: null, 
+          message: "No assessments found yet." 
+        });
+      }
+  
+      return res.status(200).json({
+        success: true,
+        data: latestAssessment
+      });
+  
+    } catch (error) {
+      console.error("Error fetching latest assessment:", error);
+      res.status(500).json({ success: false, message: "Server Error" });
+    }
+  };

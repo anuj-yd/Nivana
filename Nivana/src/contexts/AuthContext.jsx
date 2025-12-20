@@ -8,6 +8,7 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
+  // Default true rakha hai taki reload hote hi loading state me rahe
   const [isLoading, setIsLoading] = useState(true);
 
   // 1. Initial Load: Check LocalStorage & URL Params (OAuth)
@@ -30,11 +31,13 @@ export const AuthProvider = ({ children }) => {
         
         } else if (tokenFromStorage) {
           setToken(tokenFromStorage);
+        } else {
+          // Agar koi token nahi mila, tabhi loading band karo
+          setIsLoading(false);
         }
       } catch (e) {
         console.warn('Error reading token:', e);
         setToken(null);
-      } finally {
         setIsLoading(false);
       }
     };
@@ -54,19 +57,23 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
-    // Optional: Agar dashboard par ho toh home par redirect bhi kar sakte ho
-    // window.location.href = '/login'; 
+    window.location.href = '/login'; 
   };
 
-  // 4. User Fetch Effect (FIXED: Handles Expired Token)
+  // 4. User Fetch Effect (Handles Data Fetching & Loading State)
   useEffect(() => {
     const fetchUser = async () => {
+      // Agar token null hai, toh kuch fetch mat karo
       if (!token) {
-        setUser(null);
+        // Agar pehle se loading true thi (initial load), toh ab false kardo
+        setIsLoading(false);
         return;
       }
 
       try {
+        // ✅ Loading ON rakho jab tak data na aaye
+        setIsLoading(true);
+
         const base = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const res = await fetch(`${base}/api/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -77,18 +84,20 @@ export const AuthProvider = ({ children }) => {
         }
 
         const data = await res.json();
-        setUser(data.user || null);
+        
+        // Backend se user data set karo
+        setUser(data.user || data); // Adjust based on backend response structure
 
       } catch (e) {
         console.warn('Authentication failed, auto-logging out:', e);
         
-        // --- IMPORTANT FIX ---
-        // Agar token invalid hai, toh turant sab clear karo
-        // Varna app blank screen par atak jayega
+        // Agar token expire ho gaya, to clean up karo
         localStorage.removeItem('token');
         setToken(null);
         setUser(null);
-        // ---------------------
+      } finally {
+        // ✅ Data aane ke baad hi Loading band karo
+        setIsLoading(false);
       }
     };
 
@@ -98,7 +107,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     token,
     user,
-    isAuthenticated: !!token, // Convert token existence to boolean
+    isAuthenticated: !!token, 
     isLoading,
     login,
     logout,

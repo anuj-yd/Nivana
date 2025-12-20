@@ -37,4 +37,26 @@ router.get(
   }
 );
 
+
+// --- GitHub OAuth Routes ---
+router.get(
+  "/github",
+  passport.authenticate("github", {
+    scope: ["user:email"], // 🔥 YAHI FIX HAI
+  })
+);
+
+router.get(
+  "/github/callback",
+  passport.authenticate("github", {
+    failureRedirect: "/login",
+    session: false,
+  }),
+  (req, res) => {
+    const clientURL = process.env.CLIENT_URL || "http://localhost:5173";
+    res.redirect(`${clientURL}/dashboard`);
+  }
+);
+
+
 module.exports = router;

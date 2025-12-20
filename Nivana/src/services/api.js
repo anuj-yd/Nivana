@@ -1,7 +1,12 @@
 import axios from 'axios';
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api';
 
-const instance = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
+// ✅ UPDATE: Added 'timeout' so requests don't hang forever
+const instance = axios.create({ 
+  baseURL: API_BASE_URL, 
+  withCredentials: true,
+  timeout: 30000 // 30 Seconds Hard Limit
+});
 
 instance.interceptors.request.use((config) => {
   try {
@@ -14,11 +19,19 @@ instance.interceptors.request.use((config) => {
 instance.interceptors.response.use(
   (res) => res,
   (err) => {
+    // Agar Request Timeout ho gayi (Server too slow)
+    if (err.code === 'ECONNABORTED') {
+        console.error("Request timed out");
+    }
+
     if (err?.response?.status === 401) {
       try {
         localStorage.removeItem('token');
         if (typeof window !== 'undefined') {
-          window.location.replace('/login');
+          // Optional: Check if we are already on login page to avoid loop
+          if (!window.location.pathname.includes('/login')) {
+             window.location.replace('/login');
+          }
         }
       } catch (e) {}
     }
@@ -55,7 +68,6 @@ export const apiService = {
     const res = await instance.post('/assessments/submit', payload);
     return res.data;
   },
-  // ✅ Handle FormData for Profile Update
   updateUserProfile: async (formData) => {
     const res = await instance.put('/auth/profile', formData);
     return res.data;

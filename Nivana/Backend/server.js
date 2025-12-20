@@ -1,5 +1,5 @@
 const path = require("path");
-// ✅ FIX: .env file ka pakka path set kiya taaki API Key load ho jaye
+// ✅ FIX: .env file ka pakka path set kiya
 require("dotenv").config({ path: path.resolve(__dirname, "./.env") });
 
 const express = require("express");
@@ -21,12 +21,14 @@ const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
 console.log("🔑 API Key Status:", process.env.GEMINI_API_KEY ? "Loaded ✅" : "MISSING ❌");
 
 /* ---------------------- MIDDLEWARE ---------------------- */
-app.use(express.json());
+app.use(express.json()); // Body parser
 
 app.use(
   cors({
     origin: FRONTEND_URL,
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE"], // Allowed methods
+    allowedHeaders: ["Content-Type", "Authorization"], // Allowed headers
   })
 );
 
@@ -38,6 +40,10 @@ app.use(
     secret: process.env.SESSION_SECRET || "some_session_secret",
     resave: false,
     saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production", // HTTPS only in production
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
   })
 );
 
@@ -51,6 +57,7 @@ mongoose
   .catch((err) => console.log("❌ MongoDB Error:", err));
 
 /* ---------------------- MODELS ---------------------- */
+// ✅ Models yaha load ho rahe hain
 require("./models/User");
 require("./models/Assessment");
 require("./models/Mood");
@@ -86,6 +93,7 @@ passport.use(
             fullName: profile.displayName,
             email,
             provider: "google",
+            googleId: profile.id // Optional: Future proofing ke liye save kar sakte hain
           });
         }
         done(null, user);
@@ -96,29 +104,57 @@ passport.use(
   )
 );
 
-// -- GITHUB STRATEGY --
+// -- GITHUB STRATEGY (UPDATED & FIXED) --
 passport.use(
   new GitHubStrategy(
     {
       clientID: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
       callbackURL: `${BACKEND_URL}/auth/github/callback`,
+      scope: ['user:email'] // Email access maangna zaroori hai
     },
-    async (_, __, profile, done) => {
+    async (accessToken, refreshToken, profile, done) => {
       try {
         const User = mongoose.model("User");
-        const email = profile.emails?.[0]?.value || `${profile.username}@github.local`;
-        let user = await User.findOne({ email });
 
-        if (!user) {
-          user = await User.create({
-            fullName: profile.displayName || profile.username,
-            email,
-            provider: "github",
-          });
+        // 1. STEP 1: GitHub ID se check karo (Sabse Accurate)
+        // Note: Apne User Model me 'githubId' field zaroor add karna
+        let user = await User.findOne({ githubId: profile.id });
+
+        if (user) {
+          return done(null, user); // Existing GitHub user -> Login
         }
+
+        // 2. STEP 2: Agar ID nahi mili, to Email se check karo (Merge Logic)
+        // GitHub array of emails bhejta hai, primary wala dhundo
+        let email = profile.emails && profile.emails.length > 0 
+                    ? (profile.emails.find(e => e.primary) || profile.emails[0]).value 
+                    : null;
+
+        if (email) {
+          user = await User.findOne({ email });
+          if (user) {
+            // User mil gaya! Ab isme githubId save kar do (Account Merged)
+            user.githubId = profile.id;
+            // user.provider = "github"; // Provider overwrite mat karna agar wo pehle se google/email tha
+            await user.save();
+            return done(null, user);
+          }
+        }
+
+        // 3. STEP 3: Create New User (Agar na ID mili, na Email)
+        const finalEmail = email || `${profile.username}@github.local`; // Fallback only if email hidden
+
+        user = await User.create({
+          fullName: profile.displayName || profile.username,
+          email: finalEmail,
+          provider: "github",
+          githubId: profile.id, // 🔥 IMPORTANT: Ye save karna zaroori hai for next login
+        });
+
         done(null, user);
       } catch (err) {
+        console.error("GitHub Auth Error:", err);
         done(err, null);
       }
     }
@@ -135,10 +171,12 @@ app.use("/api/dashboard", require("./middleware/auth"), require("./routes/dashbo
 
 // Mood Routes
 app.use("/api/moods", require("./routes/mood"));
+app.use("/api/laughter", require("./routes/laughter"));
 
 
 /* ---------------------- OAUTH CALLBACK ROUTES ---------------------- */
 
+// Google
 app.get(
   "/auth/google",
   passport.authenticate("google", { scope: ["profile", "email"] })
@@ -153,6 +191,7 @@ app.get(
   }
 );
 
+// GitHub
 app.get(
   "/auth/github",
   passport.authenticate("github", { scope: ["user:email"] })
@@ -169,6 +208,15 @@ app.get(
 
 /* ---------------------- HEALTH CHECK ---------------------- */
 app.get("/api/health", (req, res) => res.json({ ok: true }));
+
+/* ---------------------- GLOBAL ERROR HANDLER ---------------------- */
+app.use((err, req, res, next) => {
+  console.error("🔥 Server Error Stack:", err.stack);
+  res.status(500).json({ 
+    msg: "Internal Server Error", 
+    error: err.message || "Something went wrong on the server" 
+  });
+});
 
 /* ---------------------- START SERVER ---------------------- */
 const PORT = process.env.PORT || 5000;

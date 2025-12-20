@@ -10,6 +10,11 @@ import Profile from "./components/Profile";
 import Guidance from "./components/Guidance";
 import History from "./components/History";
 import GlobalLayout from "./components/GlobalLayout";
+import PrivateJournaling from "./components/PrivateJournaling";
+import GuidedMeditation from "./components/GuidedMeditation";
+import SoundScape from "./components/SoundScape";
+import LaughterTherapy from "./components/LaughterTherapy";
+
 
 // ✅ 1. Naye Components Import Karein
 import ForgotPassword from "./components/ForgotPassword";
@@ -37,6 +42,10 @@ function App() {
            <Route path="/guidance" element={<Guidance />} />
            <Route path="/history" element={<History />} />
            <Route path="/profile" element={<Profile />} />
+           <Route path="/journal" element={<PrivateJournaling />} />
+           <Route path="/meditation" element={<GuidedMeditation />} />
+           <Route path="/sounds" element={<SoundScape />} />
+           <Route path="/laughter" element={<LaughterTherapy />} />
         </Route>
       </Routes>
     </AuthProvider>
