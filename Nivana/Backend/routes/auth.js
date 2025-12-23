@@ -6,8 +6,8 @@ const {
   signup, 
   getMe, 
   updateProfile, 
-  forgotPassword, // ✅ New Import
-  resetPassword   // ✅ New Import
+  forgotPassword, 
+  resetPassword   
 } = require("../controllers/authController");
 const authMiddleware = require("../middleware/auth");
 const upload = require("../middleware/upload");

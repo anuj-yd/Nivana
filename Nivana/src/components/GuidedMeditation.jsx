@@ -93,7 +93,7 @@ export default function GuidedMeditation() {
       title: "Custom Session",
       duration: customDuration * 60,
       description: "Your personalized meditation practice",
-      audioUrl: "/audio/ambient-loop.mp3",
+      audioUrl: "../sounds/meditation-background.mp3",
       isCustom: true,
     }
     setSelectedMeditation(customMeditation)

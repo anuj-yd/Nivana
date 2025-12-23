@@ -17,7 +17,6 @@ router.get("/", auth, async (req, res) => {
     const userId = req.user.id;
     
     // 1. USER/STREAK DATA FETCH (No Update here)
-    // सिर्फ डेटा fetch करो, update नहीं
     const user = await User.findById(userId).select('fullName streak');
     if (!user) return res.status(404).json({ msg: "User not found" });
 

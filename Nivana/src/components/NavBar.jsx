@@ -44,7 +44,7 @@ export default function Navbar() {
                 Nivana
               </div>
               <div className="text-xs text-[#163020]/70">
-                Bloom · Breathe · Believe
+                Your Mind Speaks Nivana Listens
               </div>
             </div>
           </div>

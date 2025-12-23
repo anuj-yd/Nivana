@@ -4,7 +4,7 @@ import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { apiService } from "../services/api"; 
 
-// ✅ UPDATED RECHARTS IMPORTS (Added Radar components)
+// ✅ RECHARTS IMPORTS
 import {
   AreaChart,
   Area,
@@ -20,9 +20,6 @@ import {
   PolarRadiusAxis,
 } from "recharts";
 
-// ✅ HARDCODED URL (Matches your setup)
-const API_URL = "http://localhost:5000/api";
-
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,9 +34,11 @@ export default function Dashboard() {
   const [toast, setToast] = useState(null); 
   const [modalOpen, setModalOpen] = useState(false);
   const [weeklyMoodData, setWeeklyMoodData] = useState([]);
+  // 🔥 New State for controlling X-Axis labels
+  const [xAxisTicks, setXAxisTicks] = useState([]); 
   const [loading, setLoading] = useState(true);
 
-  // ✅ NEW: View Mode for Focus Areas (List vs Graph)
+  // View Mode for Focus Areas
   const [viewMode, setViewMode] = useState("list"); 
 
   // Wellness Status Badge State
@@ -58,17 +57,43 @@ export default function Dashboard() {
     { area: "Stress Control", progress: 0, color: "bg-gray-200" },
   ]);
 
-  // ✨ CUSTOM TOOLTIP COMPONENT FOR MOOD GRAPH
+  // 🔥🔥 FIXED: CUSTOM TOOLTIP LOGIC 🔥🔥
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
+      // payload[0].payload gives access to the full data object (id, day, moodScore)
+      const currentData = payload[0].payload; 
+      const score = currentData.moodScore;
+      
+      // Exact mapping based on your mood scores
+      let moodText = "";
+      let moodColorClass = "";
+
+      if (score >= 9) { // 10
+        moodText = "🌟 Great";
+        moodColorClass = "text-green-600";
+      } else if (score >= 7) { // 8
+        moodText = "😊 Good";
+        moodColorClass = "text-teal-600";
+      } else if (score >= 5) { // 6 (Okay) or 5 (Avg)
+        moodText = "🌤️ Okay";
+        moodColorClass = "text-blue-500";
+      } else if (score >= 3) { // 4
+        moodText = "🌧️ Low";
+        moodColorClass = "text-orange-500";
+      } else { // 2 or below
+        moodText = "🌪️ Rough";
+        moodColorClass = "text-red-500";
+      }
+
       return (
-        <div className="bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-[var(--shadow-float)] border border-green-100 text-center">
-          <p className="text-sm font-bold text-gray-500 mb-1">{label}</p>
-          <p className="text-lg font-bold text-green-600">
-            Mood: {payload[0].value}/10
+        <div className="bg-white/95 backdrop-blur-xl p-4 rounded-2xl shadow-[var(--shadow-float)] border border-gray-100 text-center z-50">
+          {/* Show the Day Name (Mon, Tue) instead of Index */}
+          <p className="text-sm font-bold text-gray-400 mb-1 uppercase tracking-wider">{currentData.day}</p>
+          <p className={`text-2xl font-black ${moodColorClass}`}>
+            {score}/10
           </p>
-          <div className="text-xs text-green-800/60 font-medium mt-1">
-             {payload[0].value >= 8 ? "🌟 Amazing!" : payload[0].value >= 5 ? "😊 Doing Good" : "🌧️ Tough Day"}
+          <div className={`text-sm font-bold mt-1 ${moodColorClass}`}>
+             {moodText}
           </div>
         </div>
       );
@@ -76,7 +101,6 @@ export default function Dashboard() {
     return null;
   };
 
-  // ✅ NEW: Helper for Focus Area Icons & Insights
   const getAreaDetails = (area, score) => {
     const details = {
       "Sleep Quality": { icon: "😴", low: "prioritizing rest", high: "Great recovery" },
@@ -96,7 +120,6 @@ export default function Dashboard() {
     return { icon: meta.icon, insight };
   };
 
-  // 🔐 TOKEN GUARD
   useEffect(() => {
     if (auth.isLoading) return;
     if (!auth.isAuthenticated) {
@@ -117,7 +140,7 @@ export default function Dashboard() {
       icon: "🧘",
       title: "Quick Calm",
       description: "2-minute breathing exercise",
-      path: "/breathing",
+      path: "/meditation",
       gradient: true,
       style: "bg-gradient-to-br from-green-400 to-green-600 text-white shadow-[var(--shadow-soft)]",
     },
@@ -131,9 +154,17 @@ export default function Dashboard() {
     },
     {
       icon: "🎧",
-      title: "Meditation",
+      title: "Ambient Sounds",
       description: "Guided audio practice",
-      path: "/meditation",
+      path: "/sounds",
+      gradient: false,
+      style: "bg-white/80 shadow-[var(--shadow-soft)] border border-black/10",
+    },
+    {
+      icon: "😂",
+      title: "Laughter Therapy",
+      description: "Guided laughter practice",
+      path: "/laughter",
       gradient: false,
       style: "bg-white/80 shadow-[var(--shadow-soft)] border border-black/10",
     },
@@ -159,7 +190,6 @@ export default function Dashboard() {
     }
   };
 
-  // Logic to handle Zero or Real Data
   const computeImprovementAreasFromAssessment = (assessment) => {
     if (!assessment || !assessment.llmAnalysis || !assessment.llmAnalysis.scores) {
         return [
@@ -173,7 +203,6 @@ export default function Dashboard() {
 
     const scores = assessment.llmAnalysis.scores;
 
-    // Logic: Problem Score -> Health Score (100 - Problem)
     const getHealthScore = (problemScore) => {
         const val = Number(problemScore) || 0;
         return Math.max(0, Math.min(100, 100 - val));
@@ -204,27 +233,11 @@ export default function Dashboard() {
 
   const navLinkBase = "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-black/60";
 
-  // ---------- 🔥 REFRESH DASHBOARD ----------
   const refreshDashboard = async () => {
     try {
-      setLoading(true);
-      const token = auth.token;
-      if (!token) return; 
+      if(weeklyMoodData.length === 0) setLoading(true);
+      const data = await apiService.getDashboard(); 
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); 
-
-      const res = await fetch(`${API_URL}/dashboard`, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-
-      if (!res.ok) throw new Error("Dashboard fetch failed");
-
-      const data = await res.json();
-      
       let finalStreak = 0;
       let finalLongest = 0;
       let finalBadges = [];
@@ -243,7 +256,23 @@ export default function Dashboard() {
       setStreak(Number(finalStreak));
       setLongest(Number(finalLongest));
       setBadges(finalBadges);
-      setWeeklyMoodData((data.weeklyMood || []).map((d) => ({ day: d.day, moodScore: d.score })));
+      
+      const rawMoods = data.weeklyMood || [];
+      
+      // 🔥 FIX: Mapping unique ID for X-Axis to handle multiple same-day entries
+      const processedMoods = rawMoods.map((d, index) => ({
+        id: index, 
+        day: d.day, 
+        moodScore: d.score 
+      }));
+
+      // 🔥🔥 NEW LOGIC: Calculate unique ticks (Only first occurrence of a day)
+      const uniqueTicks = processedMoods
+        .filter((item, index) => index === 0 || item.day !== processedMoods[index - 1].day)
+        .map(item => item.id);
+      
+      setXAxisTicks(uniqueTicks); // Set the calculated ticks
+      setWeeklyMoodData(processedMoods);
       
       setImprovementAreas(computeImprovementAreasFromAssessment(data.latestAssessment));
       
@@ -252,7 +281,7 @@ export default function Dashboard() {
 
     } catch (err) {
       console.error("Dashboard error:", err);
-      if (err.name === 'AbortError') {
+      if (err.code === 'ECONNABORTED') {
          setToast({ title: "Network Slow", msg: "Taking longer than usual..." });
       }
     } finally {
@@ -262,8 +291,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (auth.isLoading) return;
-    if (auth.isAuthenticated) refreshDashboard();
-  }, [auth.isLoading, auth.isAuthenticated, location.key]);
+    if (auth.isAuthenticated) {
+        refreshDashboard();
+    }
+  }, [auth.isLoading, auth.isAuthenticated]); 
 
   useEffect(() => {
     const handler = (e) => refreshDashboard();
@@ -310,43 +341,23 @@ export default function Dashboard() {
     const payload = {
         mood: selectedMood,
         score: getMoodScore(selectedMood),
-        date: new Date().toISOString(),
+        date: new Date().toISOString(), 
     };
 
     try {
-      const res = await fetch(`${API_URL}/moods`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${auth.token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const text = await res.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        throw new Error("Server Error");
-      }
-
-      if (res.ok) {
-        setToast({ title: "Mood Logged", msg: "Added to your history" });
-        setTimeout(() => setToast(null), 3000);
-        refreshDashboard();
-      } else {
-        throw new Error(data.message || data.msg || "Failed to save mood");
-      }
+      await apiService.logMood(payload);
+      setToast({ title: "Mood Logged", msg: "Added to your history" });
+      setTimeout(() => setToast(null), 3000);
+      await refreshDashboard();
     } catch (err) {
       console.error("Mood Select Error:", err);
-      setToast({ title: "Error", msg: err.message });
+      const errorMessage = err.response?.data?.message || err.message || "Failed to save mood";
+      setToast({ title: "Error", msg: errorMessage });
     }
   };
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] overflow-x-hidden relative">
-      {/* TOAST */}
       {toast && (
         <div className="fixed right-6 top-6 z-50">
           <motion.div
@@ -361,7 +372,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* STREAK MODAL */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" aria-modal="true" role="dialog">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeStreakModal} />
@@ -421,14 +431,12 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* BACKGROUND BLOBS */}
       <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
         <div className="nature-blob -top-32 -right-32 w-96 h-96 bg-green-300/30"></div>
         <div className="nature-blob top-1/4 -left-20 w-80 h-80 bg-teal-300/20"></div>
         <div className="nature-blob bottom-1/3 right-1/4 w-72 h-72 bg-yellow-200/20"></div>
       </div>
 
-      {/* SIDEBAR */}
       <aside className="hidden md:flex fixed left-0 top-0 w-64 h-screen flex-col p-6 bg-white/80 backdrop-blur-xl border-r border-green-300/30 shadow-[var(--shadow-soft)] overflow-y-auto">
         <div className="flex items-center gap-3 mb-12">
           <div className="border-teal-200 rounded-full">
@@ -469,9 +477,7 @@ export default function Dashboard() {
         </button>
       </aside>
 
-      {/* MAIN CONTENT */}
       <main className="md:ml-64 p-6 md:p-8">
-        {/* HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
             <div className="text-sm text-black/50">Welcome back,</div>
@@ -480,27 +486,54 @@ export default function Dashboard() {
             </h1>
           </div>
 
-          {/* STREAK + WELLNESS BADGE */}
           <div className="flex items-center gap-3">
-            {/* 🔥 WELLNESS STATUS BADGE */}
-            {wellnessStatus.label !== "No Data" && (
-                <div className={`px-4 py-2 rounded-xl flex items-center gap-2 font-medium shadow-[var(--shadow-soft)] transition-all ${wellnessStatus.color}`}>
-                    <span className="text-lg">{wellnessStatus.icon}</span>
-                    <span className="text-sm">{wellnessStatus.label}</span>
+            
+            {wellnessStatus.label !== "No Data" && (() => {
+              const badgeStyles = {
+                "Thriving": { icon: "🌟", color: "bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-500/20" },
+                "Balanced": { icon: "🧘", color: "bg-blue-50 text-blue-700 border-blue-200 ring-blue-500/20" },
+                "Healing":  { icon: "🌿", color: "bg-violet-50 text-violet-700 border-violet-200 ring-violet-500/20" },
+                "Stressed": { icon: "⚡", color: "bg-amber-50 text-amber-700 border-amber-200 ring-amber-500/20" },
+                "Drained":  { icon: "🔋", color: "bg-rose-50 text-rose-700 border-rose-200 ring-rose-500/20" }
+              };
+
+              const activeStyle = badgeStyles[wellnessStatus.label] || { 
+                icon: wellnessStatus.icon, 
+                color: `${wellnessStatus.color} border-transparent ring-transparent` 
+              };
+
+              return (
+                <div className={`
+                  relative px-4 py-1.5 rounded-full flex items-center gap-2.5 
+                  border ring-1 ring-inset shadow-sm backdrop-blur-md 
+                  transition-all duration-300 hover:scale-105 cursor-default
+                  ${activeStyle.color}
+                `}>
+                  <span className="absolute top-0 right-0 -mt-0.5 -mr-0.5 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-current"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-current opacity-80"></span>
+                  </span>
+
+                  <span className="text-lg drop-shadow-sm filter">{activeStyle.icon}</span>
+                  <span className="text-sm font-semibold tracking-wide">{wellnessStatus.label}</span>
                 </div>
-            )}
+              );
+            })()}
 
             <button
               onClick={openStreakModal}
-              className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-xl border border-black/5 shadow-[var(--shadow-soft)] hover:scale-105 transition-transform"
+              className="
+                group flex items-center gap-2 bg-white/60 px-3 py-1.5 
+                rounded-full border border-black/5 shadow-sm 
+                hover:shadow-md hover:scale-105 transition-all duration-300
+              "
             >
-              <div className="text-xl">🔥</div>
-              <div className="text-sm font-semibold">{streak}</div>
+              <div className="text-xl group-hover:animate-bounce">🔥</div>
+              <div className="text-sm font-bold text-gray-700">{streak}</div>
             </button>
           </div>
         </div>
 
-        {/* MOOD SELECTOR */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -536,18 +569,16 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-        {/* QUICK ACTIONS + GRAPHS */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           
-          {/* CHARTS */}
           <div className="lg:col-span-2 grid grid-rows-2 gap-6">
             
-            {/* MOOD GRAPH */}
+            {/* 🔥 MOOD GRAPH SECTION 🔥 */}
             <div className="p-6 rounded-[2rem] bg-white/80 shadow-[var(--shadow-soft)] border border-black/10">
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h3 className="text-lg font-bold text-gray-800">Mood Flow</h3>
-                  <p className="text-xs text-gray-500 font-medium">Your emotional journey this week</p>
+                  <p className="text-xs text-gray-500 font-medium">Your emotional journey</p>
                 </div>
                 <div className="px-3 py-1 rounded-full bg-green-50 text-green-700 text-xs font-bold border border-green-100">
                   Last 7 Days
@@ -564,20 +595,33 @@ export default function Dashboard() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                    
+                    {/* 🔥 FIX 1: Use ticks prop to show only one label per day */}
                     <XAxis 
-                      dataKey="day" 
+                      dataKey="id" 
+                      ticks={xAxisTicks} 
                       axisLine={false} 
                       tickLine={false} 
                       tick={{ fill: '#9CA3AF', fontSize: 12, fontWeight: 500 }} 
                       dy={10}
+                      interval={0} // Ensure the calculated ticks are forced to show
+                      tickFormatter={(val) => weeklyMoodData.find(x => x.id === val)?.day || ""}
                     />
+                    
                     <YAxis 
                       domain={[0, 10]} 
                       axisLine={false} 
                       tickLine={false} 
                       tick={{ fill: '#9CA3AF', fontSize: 12 }} 
                     />
-                    <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#4ade80', strokeWidth: 2, strokeDasharray: '5 5' }} />
+                    
+                    {/* 🔥 FIX 2: shared={false} allows separate tooltips for overlapping/close points */}
+                    <Tooltip 
+                        content={<CustomTooltip />} 
+                        cursor={{ stroke: '#4ade80', strokeWidth: 2, strokeDasharray: '5 5' }} 
+                        shared={false} 
+                    />
+                    
                     <Area 
                       type="monotone" 
                       dataKey="moodScore" 
@@ -586,16 +630,15 @@ export default function Dashboard() {
                       fillOpacity={1} 
                       fill="url(#colorMood)" 
                       activeDot={{ r: 8, strokeWidth: 0, fill: '#15803d' }} 
+                      connectNulls={true}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            {/* ✨ UPDATED FOCUS AREAS & BALANCE SECTION (List/Graph Toggle) */}
             <div className="p-6 rounded-[2rem] bg-white/80 shadow-[var(--shadow-soft)] border border-black/10 flex flex-col h-full relative overflow-hidden">
               
-              {/* Header with Toggle */}
               <div className="flex justify-between items-start mb-6 z-10">
                 <div>
                   <h3 className="text-lg font-bold text-gray-800">Wellness Balance</h3>
@@ -604,7 +647,6 @@ export default function Dashboard() {
                   </p>
                 </div>
                 
-                {/* View Toggle Button */}
                 <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
                   <button 
                     onClick={() => setViewMode("list")}
@@ -621,10 +663,8 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* CONTENT AREA */}
               <div className="flex-1 flex items-center justify-center">
                 
-                {/* OPTION A: RADAR CHART (Visual Balance) */}
                 {viewMode === "radar" && (
                   <div className="w-full h-[250px] relative">
                     <ResponsiveContainer width="100%" height="100%">
@@ -649,7 +689,6 @@ export default function Dashboard() {
                         />
                       </RadarChart>
                     </ResponsiveContainer>
-                    {/* Central Score Indicator */}
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
                       <div className="text-xs font-bold text-green-700 bg-white/80 px-2 py-1 rounded-full backdrop-blur-sm">
                         Avg: {Math.round(improvementAreas.reduce((a, b) => a + b.progress, 0) / 5)}%
@@ -658,7 +697,6 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* OPTION B: RICH LIST (Actionable Details) */}
                 {viewMode === "list" && (
                   <div className="w-full space-y-4">
                     {improvementAreas.map((it, index) => {
@@ -672,7 +710,6 @@ export default function Dashboard() {
                           transition={{ delay: index * 0.1 }}
                           className="group"
                         >
-                          {/* Labels Row */}
                           <div className="flex items-end justify-between mb-1.5">
                             <div className="flex items-center gap-2">
                               <span className="text-lg bg-gray-50 w-8 h-8 flex items-center justify-center rounded-lg border border-gray-100">
@@ -692,9 +729,7 @@ export default function Dashboard() {
                             </div>
                           </div>
 
-                          {/* Progress Bar */}
                           <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden relative border border-gray-100">
-                            {/* Background Pattern */}
                             <div className="absolute inset-0 opacity-30 w-full h-full" 
                                 style={{ backgroundImage: 'linear-gradient(45deg,rgba(0,0,0,.03) 25%,transparent 25%,transparent 50%,rgba(0,0,0,.03) 50%,rgba(0,0,0,.03) 75%,transparent 75%,transparent)', backgroundSize: '1rem 1rem' }} 
                             />
@@ -709,7 +744,6 @@ export default function Dashboard() {
                                 "bg-gradient-to-r from-green-400 to-green-500"
                               }`}
                             >
-                              {/* Shimmer Effect */}
                               <div className="absolute top-0 left-0 h-full w-full bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shimmer" />
                             </motion.div>
                           </div>
@@ -722,7 +756,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* QUICK ACTIONS */}
           <div className="p-6 rounded-[2rem] bg-white/80 shadow-[var(--shadow-soft)] border border-black/10">
             <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
             <div className="grid grid-cols-1 gap-4">

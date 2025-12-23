@@ -1,5 +1,6 @@
-// src/contexts/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
+// ✅ Import apiService
+import { apiService } from '../services/api'; 
 
 const AuthContext = createContext(null);
 
@@ -60,12 +61,11 @@ export const AuthProvider = ({ children }) => {
     window.location.href = '/login'; 
   };
 
-  // 4. User Fetch Effect (Handles Data Fetching & Loading State)
+  // 4. User Fetch Effect (✅ INTEGRATED WITH APISERVICE)
   useEffect(() => {
     const fetchUser = async () => {
       // Agar token null hai, toh kuch fetch mat karo
       if (!token) {
-        // Agar pehle se loading true thi (initial load), toh ab false kardo
         setIsLoading(false);
         return;
       }
@@ -74,24 +74,17 @@ export const AuthProvider = ({ children }) => {
         // ✅ Loading ON rakho jab tak data na aaye
         setIsLoading(true);
 
-        const base = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-        const res = await fetch(`${base}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) {
-          throw new Error('Token invalid or expired');
-        }
-
-        const data = await res.json();
+        // ✅ Using apiService instead of fetch
+        // Token automatically attached via api.js interceptors
+        const data = await apiService.getCurrentUser();
         
-        // Backend se user data set karo
-        setUser(data.user || data); // Adjust based on backend response structure
+        // Backend se user data set karo (Handle data.user or direct data)
+        setUser(data.user || data); 
 
       } catch (e) {
         console.warn('Authentication failed, auto-logging out:', e);
         
-        // Agar token expire ho gaya, to clean up karo
+        // Agar token invalid hai to state clear karo
         localStorage.removeItem('token');
         setToken(null);
         setUser(null);

@@ -1,13 +1,14 @@
 import React from "react";
 import { motion } from "framer-motion";
-import "./LandingPage2.css";
+import "./LandingPage2.css"; // Ensure CSS is imported
 import { useNavigate } from 'react-router-dom';
 
 export default function HeroSection() {
   const navigate = useNavigate();
 
-const goToLogin = () => navigate("/login");
-const goToSignup = () => navigate("/signup");
+  const goToLogin = () => navigate("/login");
+  const goToSignup = () => navigate("/signup");
+
   return (
     <header id="home" className="home pt-36 relative">
       <div className="max-w-6xl mx-auto px-6 flex flex-col-reverse lg:flex-row items-center gap-20">
@@ -28,8 +29,8 @@ const goToSignup = () => navigate("/signup");
             </span>
           </div>
 
-          {/* heading */}
-          <h1 className="font-display text-[56px] md:text-[64px] leading-[1.05] font-semibold text-[#143f2b]">
+          {/* heading - ADDED 'tracking-in-expand' HERE */}
+          <h1 className="font-display text-[56px] md:text-[64px] leading-[1.05] font-semibold text-[#143f2b] tracking-in-expand">
             You <span className="text-[#3fbf8e] font-bold">Deserve</span> to <br />
             Feel{" "}
             <span className="relative text-[#3fbf8e] font-bold">
@@ -104,7 +105,6 @@ const goToSignup = () => navigate("/signup");
                 className="w-full h-[360px] object-cover"
               />
 
-
               {/* SOFT OVERLAY */}
               <div
                 className="absolute inset-0 pointer-events-none"
@@ -115,14 +115,9 @@ const goToSignup = () => navigate("/signup");
               />
             </div>
           </div>
-
         </motion.div>
 
       </div>
     </header>
   );
 }
-
-
-
-

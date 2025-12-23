@@ -1,9 +1,7 @@
-
-
 // src/components/Auth.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Chrome, Github, Feather } from 'lucide-react';
+import { Chrome, Github } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LoginForm from './LoginForm';
@@ -100,7 +98,6 @@ const NivanaAuth = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-
   // Vanta
   const vantaRef = useRef(null);
   const vantaEffectRef = useRef(null);
@@ -140,9 +137,15 @@ const NivanaAuth = () => {
     setSuccessMsg('');
   };
 
+  // 🔥 YAHAN CHANGE KIYA HAI: CLEAR INPUTS ON TOGGLE 🔥
   const toggleAuthMode = () => {
     setIsAnimating(true);
     resetMessages();
+
+    // ✨ Switch karte hi purana data clear kar do
+    setFullName('');
+    setEmail('');
+    setPassword('');
 
     setTimeout(() => {
       const nextIsLogin = !isLogin;
@@ -179,6 +182,40 @@ const NivanaAuth = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     resetMessages();
+
+    // 1. Basic Empty Fields Check
+    if (!email.trim() || !password) {
+        setErrorMsg('Please fill in all required fields.');
+        return;
+    }
+
+    // 2. Signup Specific Validation
+    if (!isLogin) {
+        if (!fullName.trim()) {
+            setErrorMsg('Full Name is required for signup.');
+            return;
+        }
+
+        const nameRegex = /^[a-zA-Z\s]+$/;
+        if (!nameRegex.test(fullName)) {
+            setErrorMsg('Name must contain only letters and spaces (no numbers or symbols).');
+            return;
+        }
+    }
+
+    // 3. Email Format Validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        setErrorMsg('Please enter a valid email address.');
+        return;
+    }
+
+    // 4. Password Strength Validation
+    if (password.length < 6) {
+        setErrorMsg('Password must be at least 6 characters long.');
+        return;
+    }
+
     setLoading(true);
 
     try {
@@ -187,13 +224,12 @@ const NivanaAuth = () => {
         : `${API_BASE_URL}/api/auth/signup`;
 
       const body = isLogin ? { email, password } : { fullName, email, password };
-      // const res = await axios.post(url, body);           fix by anshi
+
       const res = await axios.post(
         url,
         body,
         { withCredentials: true }
-      );        //update by anshi
-
+      );
 
       const data = res.data;
 
@@ -203,6 +239,7 @@ const NivanaAuth = () => {
 
       auth.login(data.token, data.user);
 
+      // Login/Signup success hone par bhi data clear karein
       setFullName('');
       setEmail('');
       setPassword('');
@@ -253,12 +290,15 @@ const NivanaAuth = () => {
 
       <div className="self-draw-card relative z-10 w-full max-w-[1050px] min-h-[650px] flex flex-col md:flex-row m-4 rounded-3xl overflow-hidden border border-[#D8C3A5]/90 shadow-[0_28px_70px_rgba(36,115,108,0.35)] backdrop-blur-2xl bg-[#F5E9DA]/95">
 
-        {/* Left */}
+        {/* Left Section */}
         <div className="w-full md:w-5/12 p-10 md:p-14 flex flex-col justify-between relative overflow-hidden rounded-3xl md:rounded-none md:rounded-l-3xl border-r border-[#D8C3A5]/80 bg-linear-to-br from-[#F3DFC9] via-[#F5E9DA] to-[#F8F3E8]">
 
           <div className="relative z-10 flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-[#FDF8F1] backdrop-blur-md border border-[#D8C3A5] flex items-center justify-center shadow-md shadow-[#D8C3A5]/70">
-              <Feather className="w-5 h-5 text-teal-700" />
+            <div className="rounded-full  bg-[#FDF8F1] backdrop-blur-md border border-[#D8C3A5] flex items-center justify-center shadow-md shadow-[#D8C3A5]/70">
+              <img src="/Logo.jpg"
+                alt="Nivana Logo"
+                className="w-10 h-10 rounded-full shadow-md"
+              />
             </div>
             <span className="text-2xl font-serif font-bold tracking-wide text-teal-900">
               NIVANA
@@ -292,7 +332,7 @@ const NivanaAuth = () => {
           </div>
         </div>
 
-        {/* Right */}
+        {/* Right Section */}
         <div className="w-full md:w-7/12 p-8 md:p-16 bg-[#F8F3E8]/90 flex flex-col justify-center relative">
 
           <div className="absolute top-8 right-8 md:top-10 md:right-10 z-20">
@@ -316,11 +356,14 @@ const NivanaAuth = () => {
               {isLogin ? 'Please enter your details.' : 'It only takes a minute to start.'}
             </p>
 
+            {/* Error Message Box */}
             {errorMsg && (
               <div className="mb-4 text-sm text-[#7f2a2a] bg-[#f8d6d3] border border-[#e3a6a1] rounded-lg px-3 py-2">
                 {errorMsg}
               </div>
             )}
+            
+            {/* Success Message Box */}
             {successMsg && (
               <div className="mb-4 text-sm text-teal-900 bg-[#d8f2e3] border border-[#9fd6b5] rounded-lg px-3 py-2">
                 {successMsg}
