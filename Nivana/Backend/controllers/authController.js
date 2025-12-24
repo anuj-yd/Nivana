@@ -108,10 +108,10 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-// --- ✅ NEW & FIXED: FORGOT PASSWORD ---
+// --- ✅ FIXED: FORGOT PASSWORD (RENDER FRIENDLY) ---
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
-  let user; // ✅ Fix: User variable ko try block ke bahar declare kiya
+  let user; 
 
   try {
     user = await User.findOne({ email });
@@ -128,7 +128,8 @@ exports.forgotPassword = async (req, res) => {
 
     await user.save();
 
-    // Reset URL
+    // Reset URL Logic
+    // IMP: Render Env Vars me CLIENT_URL = https://nivana.vercel.app zaroor set karein
     const clientURL = process.env.CLIENT_URL || "http://localhost:5173";
     const resetUrl = `${clientURL}/reset-password/${resetToken}`;
 
@@ -138,9 +139,9 @@ exports.forgotPassword = async (req, res) => {
       <a href=${resetUrl} clicktracking=off>${resetUrl}</a>
     `;
 
-    // Email Config
+    // ✅ FIXED: Email Config for Render
     const transporter = nodemailer.createTransport({
-      service: "Gmail",
+      service: "gmail", // Small 'g' is standard
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS // App Password (without spaces)
@@ -149,6 +150,7 @@ exports.forgotPassword = async (req, res) => {
 
     await transporter.sendMail({
       to: user.email,
+      from: `"Nivana Support" <${process.env.EMAIL_USER}>`, // Sender Name Add kiya
       subject: "Password Reset Request - NIVANA",
       html: message,
     });
@@ -158,18 +160,17 @@ exports.forgotPassword = async (req, res) => {
   } catch (err) {
     console.error("Email Error:", err);
     
-    // ✅ Fix: Check karein agar user exist karta hai tabhi token clear karein
     if (user) {
       user.resetPasswordToken = undefined;
       user.resetPasswordExpire = undefined;
-      await user.save({ validateBeforeSave: false }); // Validation ignore karke save karein
+      await user.save({ validateBeforeSave: false }); 
     }
     
     res.status(500).json({ msg: "Email could not be sent" });
   }
 };
 
-// --- ✅ RESET PASSWORD ---
+// --- RESET PASSWORD ---
 exports.resetPassword = async (req, res) => {
   // URL se token le kar hash match karein
   const resetPasswordToken = crypto.createHash("sha256").update(req.params.resetToken).digest("hex");
