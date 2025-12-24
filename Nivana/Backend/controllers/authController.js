@@ -108,7 +108,7 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-// --- ✅ FIXED: FORGOT PASSWORD (RENDER FRIENDLY) ---
+// --- ✅ FIXED: FORGOT PASSWORD (GOOGLEMAIL HOST TRICK) ---
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
   let user; 
@@ -129,7 +129,6 @@ exports.forgotPassword = async (req, res) => {
     await user.save();
 
     // Reset URL Logic
-    // IMP: Render Env Vars me CLIENT_URL = https://nivana.vercel.app zaroor set karein
     const clientURL = process.env.CLIENT_URL || "http://localhost:5173";
     const resetUrl = `${clientURL}/reset-password/${resetToken}`;
 
@@ -139,10 +138,9 @@ exports.forgotPassword = async (req, res) => {
       <a href=${resetUrl} clicktracking=off>${resetUrl}</a>
     `;
 
-    // ✅ FIXED: Email Config for Render
-    // ✅ FINAL ATTEMPT: Force IPv4 (Ye connection problem solve kar dega)
+    // ✅ FIXED: Using 'smtp.googlemail.com' to bypass Render blocks
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
+      host: "smtp.googlemail.com", // <--- YE CHANGE KIYA HAI
       port: 587,
       secure: false, 
       auth: {
@@ -151,13 +149,12 @@ exports.forgotPassword = async (req, res) => {
       },
       tls: {
         rejectUnauthorized: false
-      },
-      // 👇 MAGIC LINE: Ye server ko IPv6 use karne se rokegi
-      family: 4, 
+      }
     });
+
     await transporter.sendMail({
       to: user.email,
-      from: `"Nivana Support" <${process.env.EMAIL_USER}>`, // Sender Name Add kiya
+      from: `"Nivana Support" <${process.env.EMAIL_USER}>`,
       subject: "Password Reset Request - NIVANA",
       html: message,
     });
