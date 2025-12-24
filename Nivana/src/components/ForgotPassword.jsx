@@ -9,6 +9,11 @@ const ForgotPassword = () => {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  // 👇 Ye logic khud decide karega ki Localhost chalana hai ya Render
+  const backendURL = import.meta.env.MODE === "development" 
+    ? "http://localhost:5000" 
+    : "https://nivana.onrender.com";
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -16,8 +21,8 @@ const ForgotPassword = () => {
     setError("");
 
     try {
-      // Backend URL check kar lena (port 5000)
-      const res = await axios.post("http://localhost:5000/api/auth/forgot-password", { email });
+      // 👇 Yahan ab dynamic URL use ho raha hai
+      const res = await axios.post(`${backendURL}/api/auth/forgot-password`, { email });
       setMessage("Check your email for the reset link!");
     } catch (err) {
       setError(err.response?.data?.msg || "Something went wrong.");

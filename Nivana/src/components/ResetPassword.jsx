@@ -11,8 +11,13 @@ const ResetPassword = () => {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   
-  const { token } = useParams(); // URL se token nikalne ke liye
+  const { token } = useParams();
   const navigate = useNavigate();
+
+  // 👇 Ye logic yahan bhi add kar diya
+  const backendURL = import.meta.env.MODE === "development" 
+    ? "http://localhost:5000" 
+    : "https://nivana.onrender.com";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,7 +29,8 @@ const ResetPassword = () => {
     setError("");
 
     try {
-      await axios.put(`http://localhost:5000/api/auth/reset-password/${token}`, { password });
+      // 👇 Dynamic URL yahan bhi lag gaya
+      await axios.put(`${backendURL}/api/auth/reset-password/${token}`, { password });
       setMessage("Password updated! Redirecting to login...");
       setTimeout(() => navigate("/login"), 3000);
     } catch (err) {
