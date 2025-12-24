@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const crypto = require("crypto"); // Built-in module
-const nodemailer = require("nodemailer"); // Email sender
+const crypto = require("crypto"); 
+const nodemailer = require("nodemailer"); 
 const User = require("../models/User");
 
 // --- LOGIN ---
@@ -108,7 +108,7 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-// --- ✅ FIXED: FORGOT PASSWORD (GOOGLEMAIL HOST TRICK) ---
+// --- ✅ FINAL FIXED: FORGOT PASSWORD (BREVO CONFIG) ---
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
   let user; 
@@ -119,16 +119,12 @@ exports.forgotPassword = async (req, res) => {
       return res.status(404).json({ msg: "User not found" });
     }
 
-    // Reset Token Generate
     const resetToken = crypto.randomBytes(20).toString("hex");
-
-    // Hash karke DB me save (Security)
     user.resetPasswordToken = crypto.createHash("sha256").update(resetToken).digest("hex");
-    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 Minutes
+    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; 
 
     await user.save();
 
-    // Reset URL Logic
     const clientURL = process.env.CLIENT_URL || "http://localhost:5173";
     const resetUrl = `${clientURL}/reset-password/${resetToken}`;
 
@@ -138,23 +134,20 @@ exports.forgotPassword = async (req, res) => {
       <a href=${resetUrl} clicktracking=off>${resetUrl}</a>
     `;
 
-    // ✅ FIXED: Using 'smtp.googlemail.com' to bypass Render blocks
+    // ✅ Brevo SMTP Transporter
     const transporter = nodemailer.createTransport({
-      host: "smtp.googlemail.com", // <--- YE CHANGE KIYA HAI
+      host: "smtp-relay.brevo.com", 
       port: 587,
       secure: false, 
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        user: process.env.EMAIL_USER, // Render Env Var: anujyadav992241@gmail.com
+        pass: process.env.EMAIL_PASS, // Render Env Var: Aapki SMTP Key
       },
-      tls: {
-        rejectUnauthorized: false
-      }
     });
 
     await transporter.sendMail({
+      from: `"Nivana Team" <${process.env.EMAIL_USER}>`, 
       to: user.email,
-      from: `"Nivana Support" <${process.env.EMAIL_USER}>`,
       subject: "Password Reset Request - NIVANA",
       html: message,
     });
@@ -163,20 +156,17 @@ exports.forgotPassword = async (req, res) => {
 
   } catch (err) {
     console.error("Email Error:", err);
-    
     if (user) {
       user.resetPasswordToken = undefined;
       user.resetPasswordExpire = undefined;
       await user.save({ validateBeforeSave: false }); 
     }
-    
     res.status(500).json({ msg: "Email could not be sent" });
   }
 };
 
 // --- RESET PASSWORD ---
 exports.resetPassword = async (req, res) => {
-  // URL se token le kar hash match karein
   const resetPasswordToken = crypto.createHash("sha256").update(req.params.resetToken).digest("hex");
 
   try {
@@ -189,11 +179,9 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ msg: "Invalid or Expired Token" });
     }
 
-    // Naya Password Hash karein
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(req.body.password, salt);
 
-    // Tokens clear karein
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
 
