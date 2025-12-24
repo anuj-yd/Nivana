@@ -11,7 +11,9 @@ import SignupForm from './SignupForm';
 import * as THREE from 'three';
 import CLOUDS from 'vanta/dist/vanta.clouds.min';
 
-const API_BASE_URL = 'http://localhost:5000';
+// const API_BASE_URL = 'http://localhost:5000';
+// Agar Vercel par environment variable hai to wo use karega, nahi to Render ka link
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://nivana.onrender.com';
 
 // Typewriter Component
 const Typewriter = ({ text, speed = 100, delay = 0 }) => {
