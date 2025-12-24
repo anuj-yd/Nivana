@@ -11,9 +11,8 @@ import SignupForm from './SignupForm';
 import * as THREE from 'three';
 import CLOUDS from 'vanta/dist/vanta.clouds.min';
 
-// const API_BASE_URL = 'http://localhost:5000';
-// Agar Vercel par environment variable hai to wo use karega, nahi to Render ka link
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://nivana.onrender.com';
+// ✅ FIX 1: Variable name matched with .env (VITE_BACKEND_URL)
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'https://nivana.onrender.com';
 
 // Typewriter Component
 const Typewriter = ({ text, speed = 100, delay = 0 }) => {
@@ -139,7 +138,7 @@ const NivanaAuth = () => {
     setSuccessMsg('');
   };
 
-  // 🔥 YAHAN CHANGE KIYA HAI: CLEAR INPUTS ON TOGGLE 🔥
+  // Clear inputs on toggle
   const toggleAuthMode = () => {
     setIsAnimating(true);
     resetMessages();
@@ -164,15 +163,16 @@ const NivanaAuth = () => {
     }, 400);
   };
 
+  // ✅ FIX 2: Added '/api' to social login URLs to match backend
   const handleSocialLogin = (provider) => {
     let url = '';
 
     switch (provider) {
       case 'google':
-        url = `${API_BASE_URL}/auth/google`;
+        url = `${API_BASE_URL}/api/auth/google`; // Updated
         break;
       case 'github':
-        url = `${API_BASE_URL}/auth/github`;
+        url = `${API_BASE_URL}/api/auth/github`; // Updated
         break;
       default:
         return;
@@ -221,6 +221,7 @@ const NivanaAuth = () => {
     setLoading(true);
 
     try {
+      // These URLs were already correct (included /api)
       const url = isLogin
         ? `${API_BASE_URL}/api/auth/login`
         : `${API_BASE_URL}/api/auth/signup`;
