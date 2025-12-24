@@ -1,15 +1,23 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const crypto = require("crypto"); // Built-in module
-const nodemailer = require("nodemailer"); // Email sender
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 const User = require("../models/User");
 
-// --- LOGIN ---
+// ✅ Resend instance (SAFE)
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
+
+/* ======================
+   LOGIN
+====================== */
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
 
+    const user = await User.findOne({ email });
     if (!user || user.provider !== "local") {
       return res.status(400).json({ msg: "Invalid credentials" });
     }
@@ -20,47 +28,62 @@ exports.login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user._id, userId: user.userId },
+      { id: user._id },
       process.env.JWT_SECRET || "secretkey",
       { expiresIn: "7d" }
     );
 
-    return res.json({
+    res.json({
       token,
       user: {
         _id: user._id,
-        userId: user.userId,
         fullName: user.fullName,
         email: user.email,
-        profileImage: user.profileImage, 
-        createdAt: user.createdAt
+        profileImage: user.profileImage,
+        createdAt: user.createdAt,
       },
     });
-
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ msg: "Server error" });
   }
 };
 
-// --- SIGNUP ---
+/* ======================
+   SIGNUP
+====================== */
 exports.signup = async (req, res) => {
   try {
     const { fullName, email, password } = req.body;
-    if (await User.findOne({ email })) return res.status(400).json({ msg: "User exists" });
+
+    if (await User.findOne({ email })) {
+      return res.status(400).json({ msg: "User already exists" });
+    }
 
     const hash = await bcrypt.hash(password, 10);
-    const user = await User.create({ fullName, email, password: hash, provider: "local" });
+    const user = await User.create({
+      fullName,
+      email,
+      password: hash,
+      provider: "local",
+    });
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET || "secretkey",
+      { expiresIn: "7d" }
+    );
+
     res.json({ token, user });
   } catch (err) {
-    console.error(err);
+    console.error("Signup error:", err);
     res.status(500).json({ msg: "Server error" });
   }
 };
 
-// --- GET ME ---
+/* ======================
+   GET ME
+====================== */
 exports.getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
@@ -70,48 +93,56 @@ exports.getMe = async (req, res) => {
   }
 };
 
-// --- UPDATE PROFILE ---
+/* ======================
+   UPDATE PROFILE
+====================== */
 exports.updateProfile = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const updates = req.body;
-
     const allowedUpdates = [
-      'fullName', 'bio', 'location', 'wellnessFocus', 
-      'emergencyName', 'emergencyPhone', 'reminderPreference'
+      "fullName",
+      "bio",
+      "location",
+      "wellnessFocus",
+      "emergencyName",
+      "emergencyPhone",
+      "reminderPreference",
     ];
 
-    const actualUpdates = {};
-    Object.keys(updates).forEach((key) => {
+    const updates = {};
+    Object.keys(req.body).forEach((key) => {
       if (allowedUpdates.includes(key)) {
-        actualUpdates[key] = updates[key];
+        updates[key] = req.body[key];
       }
     });
 
     if (req.file) {
-      actualUpdates.profileImage = `/uploads/profile_images/${req.file.filename}`;
+      updates.profileImage = `/uploads/profile_images/${req.file.filename}`;
     }
 
-    const user = await User.findByIdAndUpdate(userId, actualUpdates, { 
-      new: true, 
-      runValidators: true 
-    }).select('-password');
+    const user = await User.findByIdAndUpdate(req.user.id, updates, {
+      new: true,
+      runValidators: true,
+    }).select("-password");
 
     if (!user) {
-      return res.status(404).json({ success: false, msg: "User not found" });
+      return res.status(404).json({ msg: "User not found" });
     }
 
     res.json({ success: true, user });
   } catch (err) {
     console.error("Update error:", err);
-    res.status(500).json({ success: false, msg: "Server error updating profile" });
+    res.status(500).json({ msg: "Server error" });
   }
 };
 
-// --- ✅ NEW & FIXED: FORGOT PASSWORD ---
+/* ======================
+   FORGOT PASSWORD
+   ✅ RESEND FIRST (SAFE)
+   ✅ GMAIL FALLBACK (LOCAL)
+====================== */
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
-  let user; // ✅ Fix: User variable ko try block ke bahar declare kiya
+  let user;
 
   try {
     user = await User.findOne({ email });
@@ -119,60 +150,79 @@ exports.forgotPassword = async (req, res) => {
       return res.status(404).json({ msg: "User not found" });
     }
 
-    // Reset Token Generate
+    // 🔐 Generate token
     const resetToken = crypto.randomBytes(20).toString("hex");
 
-    // Hash karke DB me save (Security)
-    user.resetPasswordToken = crypto.createHash("sha256").update(resetToken).digest("hex");
-    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 Minutes
+    user.resetPasswordToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
 
+    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
     await user.save();
 
-    // Reset URL
     const clientURL = process.env.CLIENT_URL || "http://localhost:5173";
     const resetUrl = `${clientURL}/reset-password/${resetToken}`;
 
-    const message = `
-      <h1>You have requested a password reset</h1>
-      <p>Please go to this link to reset your password:</p>
-      <a href=${resetUrl} clicktracking=off>${resetUrl}</a>
+    const html = `
+      <h2>Password Reset</h2>
+      <p>Click the link below to reset your password:</p>
+      <a href="${resetUrl}">${resetUrl}</a>
     `;
 
-    // Email Config
-    const transporter = nodemailer.createTransport({
-      service: "Gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS // App Password (without spaces)
-      },
-    });
+    /* ======================
+       EMAIL SEND LOGIC
+    ====================== */
 
-    await transporter.sendMail({
-      to: user.email,
-      subject: "Password Reset Request - NIVANA",
-      html: message,
-    });
+    // ✅ USE RESEND (WORKS ON RENDER, NO DOMAIN NEEDED)
+    if (resend) {
+      await resend.emails.send({
+        from: "NIVANA <onboarding@resend.dev>",
+        to: user.email,
+        subject: "Password Reset - NIVANA",
+        html,
+      });
+    }
 
-    res.status(200).json({ success: true, data: "Email Sent" });
+    // ✅ FALLBACK → GMAIL (LOCAL ONLY)
+    else {
+      const transporter = nodemailer.createTransport({
+        service: "Gmail",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
 
+      await transporter.sendMail({
+        to: user.email,
+        subject: "Password Reset - NIVANA",
+        html,
+      });
+    }
+
+    res.json({ success: true, msg: "Reset link sent" });
   } catch (err) {
-    console.error("Email Error:", err);
-    
-    // ✅ Fix: Check karein agar user exist karta hai tabhi token clear karein
+    console.error("Forgot password error:", err);
+
     if (user) {
       user.resetPasswordToken = undefined;
       user.resetPasswordExpire = undefined;
-      await user.save({ validateBeforeSave: false }); // Validation ignore karke save karein
+      await user.save({ validateBeforeSave: false });
     }
-    
+
     res.status(500).json({ msg: "Email could not be sent" });
   }
 };
 
-// --- ✅ RESET PASSWORD ---
+/* ======================
+   RESET PASSWORD
+====================== */
 exports.resetPassword = async (req, res) => {
-  // URL se token le kar hash match karein
-  const resetPasswordToken = crypto.createHash("sha256").update(req.params.resetToken).digest("hex");
+  const resetPasswordToken = crypto
+    .createHash("sha256")
+    .update(req.params.resetToken)
+    .digest("hex");
 
   try {
     const user = await User.findOne({
@@ -181,22 +231,18 @@ exports.resetPassword = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ msg: "Invalid or Expired Token" });
+      return res.status(400).json({ msg: "Invalid or expired token" });
     }
 
-    // Naya Password Hash karein
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(req.body.password, salt);
-
-    // Tokens clear karein
+    user.password = await bcrypt.hash(req.body.password, 10);
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
 
     await user.save();
 
-    res.status(201).json({ success: true, data: "Password Updated Success" });
+    res.json({ success: true, msg: "Password updated successfully" });
   } catch (err) {
-    console.error(err);
+    console.error("Reset password error:", err);
     res.status(500).json({ msg: "Server error" });
   }
 };
