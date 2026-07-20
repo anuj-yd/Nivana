@@ -53,10 +53,22 @@ app.use(passport.initialize());
 // app.use(passport.session()); // Session storage skip kar rahe hain kyunki JWT use ho raha hai
 
 /* ---------------------- DB CONNECTION ---------------------- */
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => console.log("❌ MongoDB Error:", err));
+const connectDB = async () => {
+  try {
+    if (!process.env.MONGO_URI) {
+      throw new Error("MONGO_URI is not defined in environment variables");
+    }
+    const conn = await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 5000, // Fail fast if DB doesn't connect
+    });
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+  } catch (err) {
+    console.log("❌ MongoDB Connection Error:", err.message);
+    console.log("👉 TIP: If you see a timeout error, ensure your IP address (or 0.0.0.0/0 for anywhere) is whitelisted in MongoDB Atlas Network Access!");
+  }
+};
+
+connectDB();
 
 /* ---------------------- MODELS ---------------------- */
 require("./models/User"); 
