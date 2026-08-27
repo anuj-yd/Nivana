@@ -35,15 +35,9 @@ const UserSchema = new mongoose.Schema({
 
   provider: {
     type: String,
-    default: "local", // local | google | github
+    default: "local", // local | google
   },
 
-  // ✅ GITHUB ID (Pichle issue ke liye zaroori hai)
-  githubId: {
-    type: String,
-    unique: true,
-    sparse: true, // Null allow karega
-  },
 
   profileImage: {
     type: String,
@@ -59,6 +53,13 @@ const UserSchema = new mongoose.Schema({
 // 🔥 LAST ACTIVE DATE (no auto default)
 lastLoginDate: {
   type: Date
+},
+
+resetPasswordToken: {
+  type: String,
+},
+resetPasswordExpire: {
+  type: Date,
 },
 
 createdAt: {

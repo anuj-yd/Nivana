@@ -1,7 +1,7 @@
 // src/components/Auth.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Chrome, Github } from 'lucide-react';
+import { Chrome } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LoginForm from './LoginForm';
@@ -11,8 +11,8 @@ import SignupForm from './SignupForm';
 import * as THREE from 'three';
 import CLOUDS from 'vanta/dist/vanta.clouds.min';
 
-// ✅ FIX 1: Variable name matched with .env (VITE_BACKEND_URL)
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'https://nivana.onrender.com';
+// ✅ FIX 1: Variable name matched with .env (VITE_API_URL)
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Typewriter Component
 const Typewriter = ({ text, speed = 100, delay = 0 }) => {
@@ -170,9 +170,6 @@ const NivanaAuth = () => {
     switch (provider) {
       case 'google':
         url = `${API_BASE_URL}/api/auth/google`; // Updated
-        break;
-      case 'github':
-        url = `${API_BASE_URL}/api/auth/github`; // Updated
         break;
       default:
         return;
@@ -415,13 +412,6 @@ const NivanaAuth = () => {
                     className="p-3 bg-[#F5E9DA] hover:bg-[#EBDCC8] rounded-full transition-all duration-300 shadow-sm border border-[#D8C3A5] hover:border-teal-600 hover:shadow-md hover:shadow-teal-200/70"
                   >
                     <Chrome className="w-5 h-5 text-inherit" />
-                  </button>
-
-                  <button
-                    onClick={() => handleSocialLogin('github')}
-                    className="p-3 bg-[#F5E9DA] hover:bg-[#EBDCC8] rounded-full transition-all duration-300 shadow-sm border border-[#D8C3A5] hover:border-teal-600 hover:shadow-md hover:shadow-teal-200/70"
-                  >
-                    <Github className="w-5 h-5 text-black" />
                   </button>
                 </div>
               </>

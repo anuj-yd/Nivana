@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto"); // Built-in module
-const nodemailer = require("nodemailer"); // Email sender
+const { sendForgotPasswordEmail } = require("../services/email.service"); // Email sender
 const User = require("../models/User");
 
 // --- LOGIN ---
@@ -49,8 +49,9 @@ exports.signup = async (req, res) => {
     const { fullName, email, password } = req.body;
     if (await User.findOne({ email })) return res.status(400).json({ msg: "User exists" });
 
-    const hash = await bcrypt.hash(password, 10);
-    const user = await User.create({ fullName, email, password: hash, provider: "local" });
+    // Naya user banate waqt password ko manually hash karne ki zaroorat nahi hai, 
+    // kyunki UserSchema ka pre-save hook isko automatically hash kar dega.
+    const user = await User.create({ fullName, email, password, provider: "local" });
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
     res.json({ token, user });
@@ -112,8 +113,10 @@ exports.updateProfile = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
   let user; 
+  console.log("👉 Forgot Password requested for:", email);
 
   try {
+    console.log("👉 Looking for user in DB...");
     user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ msg: "User not found" });
@@ -126,34 +129,18 @@ exports.forgotPassword = async (req, res) => {
     user.resetPasswordToken = crypto.createHash("sha256").update(resetToken).digest("hex");
     user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 Minutes
 
+    console.log("👉 Saving user with reset token...");
     await user.save();
+    console.log("👉 User saved successfully.");
 
     // Reset URL Logic
     // IMP: Render Env Vars me CLIENT_URL = https://nivana.vercel.app zaroor set karein
     const clientURL = process.env.CLIENT_URL || "http://localhost:5173";
     const resetUrl = `${clientURL}/reset-password/${resetToken}`;
 
-    const message = `
-      <h1>You have requested a password reset</h1>
-      <p>Please go to this link to reset your password:</p>
-      <a href=${resetUrl} clicktracking=off>${resetUrl}</a>
-    `;
-
-    // ✅ FIXED: Email Config for Render
-    const transporter = nodemailer.createTransport({
-      service: "gmail", // Small 'g' is standard
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS // App Password (without spaces)
-      },
-    });
-
-    await transporter.sendMail({
-      to: user.email,
-      from: `"Nivana Support" <${process.env.EMAIL_USER}>`, // Sender Name Add kiya
-      subject: "Password Reset Request - NIVANA",
-      html: message,
-    });
+    console.log("👉 Sending email to:", user.email);
+    await sendForgotPasswordEmail(user.email, resetUrl);
+    console.log("👉 Email sent successfully.");
 
     res.status(200).json({ success: true, data: "Email Sent" });
 
@@ -185,9 +172,9 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ msg: "Invalid or Expired Token" });
     }
 
-    // Naya Password Hash karein
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(req.body.password, salt);
+    // Yahan password ko manually hash nahi karna hai,
+    // kyunki User model ka pre-save hook usko automatically hash kar dega.
+    user.password = req.body.password;
 
     // Tokens clear karein
     user.resetPasswordToken = undefined;

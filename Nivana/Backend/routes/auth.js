@@ -47,23 +47,6 @@ router.get(
   }
 );
 
-// --- GitHub OAuth Routes ---
-router.get(
-  "/github",
-  passport.authenticate("github", { scope: ["user:email"], session: false })
-);
 
-router.get(
-  "/github/callback",
-  passport.authenticate("github", { failureRedirect: `${FRONTEND_URL}/login`, session: false }),
-  (req, res) => {
-    const token = jwt.sign(
-      { id: req.user._id, userId: req.user.userId },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-    res.redirect(`${FRONTEND_URL}/dashboard?token=${token}`);
-  }
-);
 
 module.exports = router;

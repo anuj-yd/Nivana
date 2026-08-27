@@ -8,7 +8,6 @@ const cors = require("cors");
 const session = require("express-session");
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
-const GitHubStrategy = require("passport-github2").Strategy;
 
 const app = express();
 
@@ -119,58 +118,12 @@ passport.use(
   )
 );
 
-// 👉 2. GitHub Strategy
-passport.use(
-  new GitHubStrategy(
-    {
-      clientID: process.env.GITHUB_CLIENT_ID,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      callbackURL: `${BACKEND_URL}/api/auth/github/callback`,
-      scope: ['user:email']
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      try {
-        const User = mongoose.model("User");
-        
-        // GitHub ID se check karo
-        let user = await User.findOne({ githubId: profile.id });
 
-        if (!user) {
-           // Email se check karo (Merging)
-           let email = profile.emails && profile.emails.length > 0 
-           ? (profile.emails.find(e => e.primary) || profile.emails[0]).value 
-           : null;
-
-           if(email) {
-             user = await User.findOne({ email });
-             if(user) {
-               user.githubId = profile.id;
-               await user.save();
-               return done(null, user);
-             }
-           }
-
-           // Create New User
-           const finalEmail = email || `${profile.username}@github.local`;
-           user = await User.create({
-             fullName: profile.displayName || profile.username,
-             email: finalEmail,
-             provider: "github",
-             githubId: profile.id,
-           });
-        }
-        return done(null, user);
-      } catch (err) {
-        done(err, null);
-      }
-    }
-  )
-);
 
 /* ---------------------- ROUTES ---------------------- */
 
 // ✅ Saare Auth Routes yahan handle honge 
-// (Login, Signup, Google, Github sab iske andar hain)
+// (Login, Signup, Google sab iske andar hain)
 app.use("/api/auth", require("./routes/auth"));
 
 // Other Routes
