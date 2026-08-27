@@ -1,14 +1,6 @@
 require('dotenv').config();
 const nodemailer = require('nodemailer');
 
-
-// ham yeha ek transporter create krte jiska kaam h
-// jo google ka server hoga jo email bhejta h like smtp server(specifical for emails)
-// usne interact krne ke tranpotar banay jata h
-// or smtp server free nhi hote kuch credential lagte 
-// uhni ke liye ye env details lgti h
-// toh ab ye code hamare behalf pe 
-// google server se contact krta for emails
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
