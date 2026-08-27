@@ -71,7 +71,7 @@ createdAt: {
 // =======================================================
 // ✅ PRE-SAVE HOOK (Auto-Increment + Password Hash)
 // =======================================================
-UserSchema.pre("save", async function (next) {
+UserSchema.pre("save", async function () {
   const user = this;
 
   // ---------------------------------------------
@@ -87,7 +87,7 @@ UserSchema.pre("save", async function (next) {
       user.userId = counter.seq; // Naya number user ko dedo
     } catch (error) {
       console.error("❌ Counter Error:", error);
-      return next(error); // Save hone se rok do agar counter fail ho
+      throw error; // Save hone se rok do agar counter fail ho
     }
   }
 
@@ -95,15 +95,14 @@ UserSchema.pre("save", async function (next) {
   // 2️⃣ PASSWORD HASH LOGIC
   // ---------------------------------------------
   // Agar password modify nahi hua ya password hai hi nahi (OAuth), to return
-  if (!user.isModified("password") || !user.password) return next();
+  if (!user.isModified("password") || !user.password) return;
 
   try {
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(user.password, salt);
-    next();
   } catch (error) {
     console.error("❌ Hashing Error:", error);
-    next(error);
+    throw error;
   }
 });
 
