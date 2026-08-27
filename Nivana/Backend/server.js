@@ -135,6 +135,11 @@ app.use("/api/laughter", require("./routes/laughter"));
 // Health Check
 app.get("/api/health", (req, res) => res.json({ ok: true, msg: "Server is running 🚀" }));
 
+// Root Route (so the browser doesn't show "Cannot GET /")
+app.get("/", (req, res) => {
+  res.send("<h1>Welcome to Nivana API</h1><p>The backend is up and running!</p>");
+});
+
 /* ---------------------- ERROR HANDLING ---------------------- */
 app.use((err, req, res, next) => {
   console.error("🔥 Global Server Error:", err.stack);
