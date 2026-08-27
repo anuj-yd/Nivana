@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import CLOUDS from 'vanta/dist/vanta.clouds.min';
 
 // ✅ FIX 1: Variable name matched with .env (VITE_API_URL)
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'development' ? 'http://localhost:5000' : 'https://nivana-1.onrender.com');
 
 // Typewriter Component
 const Typewriter = ({ text, speed = 100, delay = 0 }) => {

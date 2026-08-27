@@ -10,9 +10,9 @@ const ForgotPassword = () => {
   const [error, setError] = useState("");
 
   // 👇 Ye logic khud decide karega ki Localhost chalana hai ya Render
-  const backendURL = import.meta.env.MODE === "development" 
+  const backendURL = import.meta.env.VITE_API_URL || (import.meta.env.MODE === "development" 
     ? "http://localhost:5000" 
-    : "https://nivana.onrender.com";
+    : "https://nivana-1.onrender.com");
 
   const handleSubmit = async (e) => {
     e.preventDefault();

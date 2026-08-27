@@ -62,7 +62,7 @@ export default function Profile() {
 
       // ✅ Set Profile Image Preview (Backend URL)
       if (user.profileImage) {
-        const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const serverUrl = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'development' ? 'http://localhost:5000' : 'https://nivana-1.onrender.com');
         const fullUrl = user.profileImage.startsWith('http') ? user.profileImage : `${serverUrl}${user.profileImage}`;
         setImagePreviewUrl(fullUrl);
       }
@@ -117,7 +117,7 @@ export default function Profile() {
         
         // Update local preview with real server path if returned
         if (res.user.profileImage) {
-           const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+           const serverUrl = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'development' ? 'http://localhost:5000' : 'https://nivana-1.onrender.com');
            setImagePreviewUrl(`${serverUrl}${res.user.profileImage}`);
         }
       }

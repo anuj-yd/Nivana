@@ -94,33 +94,6 @@ const FUNNY_CONTENT = {
   ],
 }
 
-const getRandomJoke = async () => {
-  setLoadingJoke(true);
-
-  try {
-    const res = await fetch("http://localhost:5000/api/laughter/joke");
-    const data = await res.json();
-
-    if (data.success) {
-      setCurrentJoke({
-        id: Date.now(),
-        ...data.joke
-      });
-      setShowPunchline(false);
-    }
-  } catch (err) {
-    setCurrentJoke({
-      id: Date.now(),
-      category: "Light",
-      setup: "Why did the backend laugh?",
-      punchline: "Because it finally worked 😂",
-      mood: "cheerful"
-    });
-    setShowPunchline(false);
-  } finally {
-    setLoadingJoke(false);
-  }
-};
 
 
 export default function LaughterTherapy() {
@@ -161,40 +134,40 @@ export default function LaughterTherapy() {
   }, [timerRunning, timeLeft])
 
   const getRandomJoke = async () => {
-  setLoadingJoke(true);
+    setLoadingJoke(true);
 
-  try {
-    let attempts = 0;
-    let newJoke = null;
+    try {
+      let attempts = 0;
+      let newJoke = null;
 
-    while (attempts < 5) {
-      const res = await fetch("http://localhost:5000/api/laughter/joke");
-      const data = await res.json();
+      while (attempts < 5) {
+        const serverUrl = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'development' ? 'http://localhost:5000' : 'https://nivana-1.onrender.com');
+        const res = await fetch(`${serverUrl}/api/laughter/joke`);
+        const data = await res.json();
 
-      if (data.success) {
-        newJoke = data.joke;
+        if (data.success) {
+          newJoke = data.joke;
 
-        // 🔥 repeat check
-        if (newJoke.setup !== lastJoke) {
-          break;
+          // 🔥 repeat check
+          if (newJoke.setup !== lastJoke) {
+            break;
+          }
         }
+        attempts++;
       }
 
-      attempts++;
-    }
+      if (newJoke) {
+        setCurrentJoke({ id: Date.now(), ...newJoke });
+        setLastJoke(newJoke.setup);
+        setShowPunchline(false);
+      }
 
-    if (newJoke) {
-      setCurrentJoke({ id: Date.now(), ...newJoke });
-      setLastJoke(newJoke.setup);
-      setShowPunchline(false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingJoke(false);
     }
-
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setLoadingJoke(false);
-  }
-};
+  };
 
 
   const revealPunchline = () => {

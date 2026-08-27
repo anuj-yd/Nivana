@@ -15,9 +15,9 @@ const ResetPassword = () => {
   const navigate = useNavigate();
 
   // 👇 Ye logic yahan bhi add kar diya
-  const backendURL = import.meta.env.MODE === "development" 
+  const backendURL = import.meta.env.VITE_API_URL || (import.meta.env.MODE === "development" 
     ? "http://localhost:5000" 
-    : "https://nivana.onrender.com";
+    : "https://nivana-1.onrender.com");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
